@@ -43,6 +43,7 @@ COMPLEX_TYPES = {
     'ns5': [
         'AccountSearchBasic',
         'CustomerSearchBasic',
+        'ItemSearchBasic',
         'LocationSearchBasic',
         'TransactionSearchBasic',
         'VendorSearchBasic',
@@ -70,7 +71,8 @@ COMPLEX_TYPES = {
         'Department', 'DepartmentSearch',
         'Location', 'LocationSearch',
         'Subsidiary', 'SubsidiarySearch',
-        'VendorCategory', 'VendorCategorySearch'
+        'VendorCategory', 'VendorCategorySearch',
+        'item', 'itemSearch'
     ],
 
     'ns19': [

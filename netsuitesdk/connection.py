@@ -16,6 +16,8 @@ from .api.custom_lists import CustomLists
 from .api.custom_records import CustomRecords
 from .internal.client import NetSuiteClient
 
+from .api.customers import Customers
+from .api.items import InventoryItems, ServiceSaleItems, NonInventorySaleItems
 
 class NetSuiteConnection:
     def __init__(self, account, consumer_key, consumer_secret, token_key, token_secret):
@@ -43,3 +45,9 @@ class NetSuiteConnection:
         self.expense_categories = ExpenseCategory(ns_client)
         self.custom_lists = CustomLists(ns_client)
         self.custom_records = CustomRecords(ns_client)
+
+        
+        self.customers = Customers(ns_client)
+        self.inventory_items = InventoryItems(ns_client)
+        self.service_sale_items = ServiceSaleItems(ns_client)
+        self.non_inventory_sale_items = NonInventorySaleItems(ns_client)
