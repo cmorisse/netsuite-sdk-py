@@ -26,8 +26,8 @@ class NetSuiteClient:
     """The Netsuite client class providing access to the Netsuite
     SOAP/WSDL web service"""
 
-    WSDL_URL_TEMPLATE = 'https://{account}.suitetalk.api.netsuite.com/wsdl/v2019_1_0/netsuite.wsdl'
-    DATACENTER_URL_TEMPLATE = 'https://{account}.suitetalk.api.netsuite.com/services/NetSuitePort_2019_1'
+    WSDL_URL_TEMPLATE = 'https://{account}.suitetalk.api.netsuite.com/wsdl/v2020_1_0/netsuite.wsdl'
+    DATACENTER_URL_TEMPLATE = 'https://{account}.suitetalk.api.netsuite.com/services/NetSuitePort_2020_1'
 
     _search_preferences = None
     _passport = None
@@ -72,7 +72,7 @@ class NetSuiteClient:
         self._client = Client(self._wsdl_url, transport=transport)
 
         # default service points to wrong data center. need to create a new service proxy and replace the default one
-        self._service_proxy = self._client.create_service('{urn:platform_2019_1.webservices.netsuite.com}NetSuiteBinding', self._datacenter_url)
+        self._service_proxy = self._client.create_service('{urn:platform_2020_1.webservices.netsuite.com}NetSuiteBinding', self._datacenter_url)
 
         # Parse all complex types specified in :const:`~netsuitesdk.netsuite_types.COMPLEX_TYPES`
         # and store them as attributes of this instance. Same for simple types.
@@ -84,9 +84,9 @@ class NetSuiteClient:
         self._is_authenticated = False
         self.set_search_preferences()
 
-    def set_search_preferences(self, page_size: int = 5, return_search_columns: bool = False):
+    def set_search_preferences(self, page_size: int = 5, return_search_columns: bool = True, body_fields_only: bool = True):
         self._search_preferences = self.SearchPreferences(
-            bodyFieldsOnly=False,
+            bodyFieldsOnly=body_fields_only,
             pageSize=page_size,
             returnSearchColumns=return_search_columns
         )
@@ -334,7 +334,7 @@ class NetSuiteClient:
         """
         method = getattr(self._service_proxy, name)
         # call the service:
-        include_search_preferences = (name == 'search')
+        include_search_preferences = (name == 'search' or name == 'searchMoreWithId')
         response = method(*args, 
                 _soapheaders=self._build_soap_headers(include_search_preferences=include_search_preferences)
                 , **kwargs)
@@ -372,6 +372,50 @@ class NetSuiteClient:
             exc = self._request_error('get', detail=status['statusDetail'][0])
             raise exc
 
+    def getAccountGovernanceInfo(self):
+        response = self.request('getAccountGovernanceInfo')
+        response = response.body.getAccountGovernanceInfoResult
+        status = response.status
+        if status.isSuccess:
+            record = response['record']
+            return record
+        else:
+            exc = self._request_error('get', detail=status['statusDetail'][0])
+            raise exc
+
+    def getDataCenterUrls(self, account):
+        response = self.request('getDataCenterUrls', account)
+        response = response.body.getDataCenterUrlsResult
+        status = response.status
+        if status.isSuccess:
+            result = response['dataCenterUrls']
+            return result
+        else:
+            exc = self._request_error('get', detail=status['statusDetail'][0])
+            raise exc
+
+
+    def getList(self, dictList):
+        """
+        TODO: JMA Constract
+        """
+
+        baseRef = []
+
+        for element in dictList:
+            baseRef.append(self.RecordRef(type=element.get('type'), internalId=element.get('internal_id')))
+
+        response = self.request('getList', baseRef=baseRef)
+        response = response.body.readResponseList
+
+        status = response.status
+        if status.isSuccess:
+            records = response['readResponse']
+            return records
+        else:
+            exc = self._request_error('getList', detail=status['statusDetail'][0])
+            raise exc
+
     def getAll(self, recordType):
         """
         Make a getAll request to retrieve all objects of type recordType.
@@ -407,6 +451,17 @@ class NetSuiteClient:
         search_record = search_cls(**kwargs)
         return search_record
 
+    def advanced_search_factory(self, type_name,  **kwargs):
+        _type_name = type_name[0].lower() + type_name[1:]
+        if not _type_name in SEARCH_RECORD_TYPES:
+            raise NetSuiteTypeError('{} is not a searchable NetSuite type!'.format(type_name))
+        advanced_search_cls_name = '{}SearchAdvanced'.format(type_name)
+        advanced_search_cls = self.get_complex_type(advanced_search_cls_name)
+        advanced_search = advanced_search_cls()
+        for key, value in kwargs.items():
+            setattr(advanced_search, key, value)
+        return advanced_search
+
     def basic_search_factory(self, type_name, **kwargs):
         _type_name = type_name[0].lower() + type_name[1:]
         if not _type_name in SEARCH_RECORD_TYPES:
@@ -435,10 +490,10 @@ class NetSuiteClient:
                     str searchId: identifier for the search
                     list records: the actual records found
         """
-        response = self.request('search',
-                                searchRecord=searchRecord)
+        response = self.request('search', searchRecord=searchRecord)
 
         result = response.body.searchResult
+        print("resultRow: %s" % result.searchRowList)
         status = result.status
         success = status.isSuccess
         if success:
@@ -457,8 +512,8 @@ class NetSuiteClient:
         response = self.request('searchMoreWithId',
                                 searchId=searchId,
                                 pageIndex=pageIndex)
-
         result = response.body.searchResult
+        print("resultRow: %s" % result.searchRowList)
         status = result.status
         success = status.isSuccess
         if success:

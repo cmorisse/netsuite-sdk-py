@@ -30,6 +30,9 @@ COMPLEX_TYPES = {
     'ns4': [
         'ApplicationInfo',
         'GetAllRequest',
+        #'getList',
+        'GetListRequest',
+        'GetListResponse',
         'GetRequest',
         'GetResponse',
         'GetAllResponse',
@@ -72,7 +75,8 @@ COMPLEX_TYPES = {
         'Location', 'LocationSearch',
         'Subsidiary', 'SubsidiarySearch',
         'VendorCategory', 'VendorCategorySearch',
-        'item', 'itemSearch'
+        'NonInventorySaleItem',
+        'ItemSearchAdvanced'
     ],
 
     'ns19': [

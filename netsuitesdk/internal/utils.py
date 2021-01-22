@@ -19,7 +19,6 @@ class PaginatedSearch:
         self._result = None
         self._type_name = type_name
         self.search_record = search_record or self._ns.search_factory(type_name=self._type_name)
-        print("search_record: %s", self.search_record)
         self.basic_search = basic_search
         if self.basic_search is not None:
             self.search_record.basic = self.basic_search
