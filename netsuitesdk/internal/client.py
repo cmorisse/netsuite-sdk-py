@@ -84,7 +84,7 @@ class NetSuiteClient:
         self._is_authenticated = False
         self.set_search_preferences()
 
-    def set_search_preferences(self, page_size: int = 5, return_search_columns: bool = True, body_fields_only: bool = True):
+    def set_search_preferences(self, page_size:int=5, return_search_columns:bool=True, body_fields_only:bool=True):
         self._search_preferences = self.SearchPreferences(
             bodyFieldsOnly=body_fields_only,
             pageSize=page_size,
@@ -333,44 +333,19 @@ class NetSuiteClient:
         :rtype: the exact type depends on the request
         """
         method = getattr(self._service_proxy, name)
-        # call the service:
-        include_search_preferences = (name == 'search' or name == 'searchMoreWithId')
-        response = method(*args, 
-                _soapheaders=self._build_soap_headers(include_search_preferences=include_search_preferences)
-                , **kwargs)
+
+        if name in ('search', 'searchMoreWithId',):
+            include_search_preferences = True
+        else:
+            include_search_preferences = False
+
+        response = method(
+            *args, 
+            _soapheaders=self._build_soap_headers(include_search_preferences=include_search_preferences),
+            **kwargs
+        )
         return response
 
-    def get(self, recordType, internalId=None, externalId=None):
-        """
-        Make a get request to retrieve an object of type recordType
-        specified by either internalId or externalId
-
-        :param str recordType: the complex type (e.g. 'vendor')
-        :param int internalId: id specifying the record to be retrieved
-        :param str externalId: str specifying the record to be retrieved
-        :return: the matching record in case of success
-        :rtype: Record
-        :raises ValueError: if neither internalId nor externalId was passed
-        """
-
-        recordType = recordType[0].lower() + recordType[1:]
-        if internalId is not None:
-            record_ref = self.RecordRef(type=recordType, internalId=internalId)
-        elif externalId is not None:
-            record_ref = self.RecordRef(type=recordType, externalId=externalId)
-        else:
-            raise ValueError('Either internalId or externalId is necessary to make a get request.')
-
-        response = self.request('get', baseRef=record_ref)
-        response = response.body.readResponse
-
-        status = response.status
-        if status.isSuccess:
-            record = response['record']
-            return record
-        else:
-            exc = self._request_error('get', detail=status['statusDetail'][0])
-            raise exc
 
     def getAccountGovernanceInfo(self):
         response = self.request('getAccountGovernanceInfo')
@@ -406,132 +381,38 @@ class NetSuiteClient:
             raise exc
 
 
-    def getList(self, dictList):
+
+
+    def get(self, recordType, internalId=None, externalId=None):
         """
-        TODO: JMA Constract
-        """
-
-        baseRef = []
-
-        for element in dictList:
-            baseRef.append(self.RecordRef(type=element.get('type'), internalId=element.get('internal_id')))
-
-        response = self.request('getList', baseRef=baseRef)
-        response = response.body.readResponseList
-
-        status = response.status
-        if status.isSuccess:
-            records = response['readResponse']
-            return records
-        else:
-            exc = self._request_error('getList', detail=status['statusDetail'][0])
-            raise exc
-
-    def getAll(self, recordType):
-        """
-        Make a getAll request to retrieve all objects of type recordType.
-        All NetSuite types available for a search
-        are listed under :const:`constants.GET_ALL_RECORD_TYPES`.
+        Make a get request to retrieve an object of type recordType
+        specified by either internalId or externalId
 
         :param str recordType: the complex type (e.g. 'vendor')
         :param int internalId: id specifying the record to be retrieved
         :param str externalId: str specifying the record to be retrieved
         :return: the matching record in case of success
         :rtype: Record
+        :raises ValueError: if neither internalId nor externalId was passed
         """
 
         recordType = recordType[0].lower() + recordType[1:]
-        record = self.GetAllRecord(recordType=recordType)
-        response = self.request('getAll', record=record)
-        response = response.body.getAllResult
+        if internalId is not None:
+            record_ref = self.RecordRef(type=recordType, internalId=internalId)
+        elif externalId is not None:
+            record_ref = self.RecordRef(type=recordType, externalId=externalId)
+        else:
+            raise ValueError('Either internalId or externalId is necessary to make a get request.')
+
+        response = self.request('get', baseRef=record_ref)
+        response = response.body.readResponse
 
         status = response.status
         if status.isSuccess:
-            records = response['recordList']['record']
-            return records
+            record = response['record']
+            return record
         else:
-            exc = self._request_error('getAll', detail=status['statusDetail'][0])
-            raise exc
-
-    def search_factory(self, type_name, **kwargs):
-        _type_name = type_name[0].lower() + type_name[1:]
-        if not _type_name in SEARCH_RECORD_TYPES:
-            raise NetSuiteTypeError('{} is not a searchable NetSuite type!'.format(type_name))
-        search_cls_name = '{}Search'.format(type_name)
-        search_cls = self.get_complex_type(search_cls_name)
-        search_record = search_cls(**kwargs)
-        return search_record
-
-    def advanced_search_factory(self, type_name,  **kwargs):
-        _type_name = type_name[0].lower() + type_name[1:]
-        if not _type_name in SEARCH_RECORD_TYPES:
-            raise NetSuiteTypeError('{} is not a searchable NetSuite type!'.format(type_name))
-        advanced_search_cls_name = '{}SearchAdvanced'.format(type_name)
-        advanced_search_cls = self.get_complex_type(advanced_search_cls_name)
-        advanced_search = advanced_search_cls()
-        for key, value in kwargs.items():
-            setattr(advanced_search, key, value)
-        return advanced_search
-
-    def basic_search_factory(self, type_name, **kwargs):
-        _type_name = type_name[0].lower() + type_name[1:]
-        if not _type_name in SEARCH_RECORD_TYPES:
-            raise NetSuiteTypeError('{} is not a searchable NetSuite type!'.format(type_name))
-        basic_search_cls_name = '{}SearchBasic'.format(type_name)
-        basic_search_cls = self.get_complex_type(basic_search_cls_name)
-        basic_search = basic_search_cls()
-        for key, value in kwargs.items():
-            setattr(basic_search, key, value)
-        return basic_search
-
-    def search(self, searchRecord):
-        """
-        Make a search request to retrieve an object of type recordType
-        specified by internalId. All NetSuite types available for a search
-        are listed under :const:`constants.SEARCH_RECORD_TYPES`.
-
-        :param Record searchRecord: data object holding all parameters for the search.
-                    The utility function `search_factory` can be used to create one.
-        :return: result records and meta data about search result
-        :rtype: SearchResult(type):
-                    int totalRecords: total number of records
-                    int pageSize: number of records per page
-                    int totalPages: number of pages
-                    int pageIndex: index of actual returned result page
-                    str searchId: identifier for the search
-                    list records: the actual records found
-        """
-        response = self.request('search', searchRecord=searchRecord)
-
-        result = response.body.searchResult
-        print("resultRow: %s" % result.searchRowList)
-        status = result.status
-        success = status.isSuccess
-        if success:
-            if hasattr(result.recordList, 'record'):
-                result.records = result.recordList.record
-                return result
-            else:
-                # Did not find anything
-                result.records = None
-                return result
-        else:
-            exc = self._request_error('search', detail=status['statusDetail'][0])
-            raise exc
-
-    def searchMoreWithId(self, searchId, pageIndex):
-        response = self.request('searchMoreWithId',
-                                searchId=searchId,
-                                pageIndex=pageIndex)
-        result = response.body.searchResult
-        print("resultRow: %s" % result.searchRowList)
-        status = result.status
-        success = status.isSuccess
-        if success:
-            result.records = result.recordList.record
-            return result
-        else:
-            exc = self._request_error('searchMoreWithId', detail=status['statusDetail'][0])
+            exc = self._request_error('get', detail=status['statusDetail'][0])
             raise exc
 
     def upsert(self, record):
@@ -565,34 +446,185 @@ class NetSuiteClient:
             exc = self._request_error('upsert', detail=status['statusDetail'][0])
             raise exc
 
-    # def upsertList(self, records):
-    #     """
-    #     Add objects of type recordType with given externalId..
-    #     If a record of specified type with matching externalId already
-    #     exists, it is updated.
+    def getList(self, recordRef:list):
+        """ Retrieve a list of one or more records by providing the unique ids that identify those records.
 
-    #     Usage example:
-    #         customer1 = self.Customer(externalId='customer', email='test1@example.com')
-    #         customer2 = self.Customer(externalId='another_customer', email='test2@example.com')
-    #         self.upsertList(records=[customer1, customer2])
+        If there are multiple ids provided, they can either belong to the same record type or 
+        different record types. For example, it is possible to retrieve a customer and a contact 
+        within a single request using this operation.
 
-    #     :param list[CompoundValue] records: the records to be created or updated
-    #     :return: a reference to the newly created or updated records
-    #     :rtype: list[CompoundValue]
-    #     """
+        If some of the provided ids are invalid, the request is still processed for the valid ids and 
+        the response will contain a warning that indicates that some of the ids were invalid.
 
-    #     response = self.request('upsertList', record=records)
-    #     responses = response.body.writeResponse
-    #     record_refs = []
-    #     for response in responses:
-    #         status = response.status
-    #         if status.isSuccess:
-    #             record_ref = response['baseRef']
-    #             self.logger.debug('Successfully updated record of type {type}, internalId: {internalId}, externalId: {externalId}'.format(
-    #                     type=record_ref['type'], internalId=record_ref['internalId'], externalId=record_ref['externalId']))
-    #             record_refs.append(record_ref)
-    #         else:
-    #             exc = self._request_error('upsertList', detail=status['statusDetail'][0])
-    #             has_failures = True
-    #             raise exc
-    #     return record_refs
+        See https://{{your_account.app.netsuite.com}}/app/help/helpcenter.nl?fid=section_N3499748.html
+
+        :param recordRef: A list of RecordRef objects that specify the ids and types of the records 
+                          to be retrieved.
+        """
+        response = self.request('getList', baseRef=recordRef)
+        result = response.body.readResponseList
+        if result.status.isSuccess:
+            return result
+        else:
+            exc = self._request_error('getList', detail=result.status['statusDetail'][0])
+            raise exc
+
+    def getAll(self, recordType):
+        """
+        Make a getAll request to retrieve all objects of type recordType.
+        All NetSuite types available for a search
+        are listed under :const:`constants.GET_ALL_RECORD_TYPES`.
+
+        :param str recordType: the complex type (e.g. 'vendor')
+        :param int internalId: id specifying the record to be retrieved
+        :param str externalId: str specifying the record to be retrieved
+        :return: the matching record in case of success
+        :rtype: Record
+        """
+
+        recordType = recordType[0].lower() + recordType[1:]
+        record = self.GetAllRecord(recordType=recordType)
+        response = self.request('getAll', record=record)
+        response = response.body.getAllResult
+
+        status = response.status
+        if status.isSuccess:
+            records = response['recordList']['record']
+            return records
+        else:
+            exc = self._request_error('getAll', detail=status['statusDetail'][0])
+            raise exc
+
+    def search(self, searchRecord):
+        """ Search for a set of records based on specific search criteria. This operation supports 
+        pagination, so that large result sets can be retrieved in smaller sets. 
+        For more information on how to control pagination, refer to SOAP Web Services Preferences.
+        See {{your_netsuite_environment}}/app/help/helpcenter.nl?fid=section_N3514306.html
+
+        :param searchRecord: A Basic, Joined or Advanced Search Record.
+
+        :return: Depending on the type of the search, result records will be stored in either 
+                recordList or searchRowList.
+        :rtype: dict
+        """
+        response = self.request(
+            'search', 
+            searchRecord=searchRecord
+        )
+        result = response.body.searchResult
+        #print("resultRow: %s" % result.searchRowList)
+        if result.status.isSuccess:
+            return result
+        else:
+            exc = self._request_error('search', detail=result.status['statusDetail'][0])
+            raise exc
+
+    def searchMoreWithId(self, searchId:str, pageIndex:int):
+        """ searchMoreWithId operation allows to reference a specific search result set by its 
+        searchId, a parameter included in all search results. As with searchMore, you must set the 
+        pageIndex value to specify which page in the search to return.
+        :param searchId: The search result ID
+        :param searchId: An index that specifies which page in the search to return.
+        See: {{your_netsuite_environment}}/app/help/helpcenter.nl?fid=section_N3523074.html
+        """
+        response = self.request(
+            'searchMoreWithId',
+            searchId=searchId,
+            pageIndex=pageIndex
+        )
+        result = response.body.searchResult
+        #print("resultRow: %s" % result.searchRowList)
+        if result.status.isSuccess:
+            return result
+        else:
+            exc = self._request_error('search', detail=result.status['statusDetail'][0])
+            raise exc
+
+
+
+    #
+    # Search model _DEPRECATED_
+    #
+    def search_factory(self, type_name, **kwargs):
+        _type_name = type_name[0].lower() + type_name[1:]
+        if not _type_name in SEARCH_RECORD_TYPES:
+            raise NetSuiteTypeError('{} is not a searchable NetSuite type!'.format(type_name))
+        search_cls_name = '{}Search'.format(type_name)
+        search_cls = self.get_complex_type(search_cls_name)
+        search_record = search_cls(**kwargs)
+        return search_record
+
+    def advanced_search_factory(self, type_name,  **kwargs):
+        _type_name = type_name[0].lower() + type_name[1:]
+        if not _type_name in SEARCH_RECORD_TYPES:
+            raise NetSuiteTypeError('{} is not a searchable NetSuite type!'.format(type_name))
+        advanced_search_cls_name = '{}SearchAdvanced'.format(type_name)
+        advanced_search_cls = self.get_complex_type(advanced_search_cls_name)
+        advanced_search = advanced_search_cls()
+        for key, value in kwargs.items():
+            setattr(advanced_search, key, value)
+        return advanced_search
+
+    def basic_search_factory(self, type_name, **kwargs):
+        _type_name = type_name[0].lower() + type_name[1:]
+        if not _type_name in SEARCH_RECORD_TYPES:
+            raise NetSuiteTypeError('{} is not a searchable NetSuite type!'.format(type_name))
+        basic_search_cls_name = '{}SearchBasic'.format(type_name)
+        basic_search_cls = self.get_complex_type(basic_search_cls_name)
+        basic_search = basic_search_cls()
+        for key, value in kwargs.items():
+            setattr(basic_search, key, value)
+        return basic_search
+
+    def search__deprecated(self, searchRecord):
+        """
+        Make a search request to retrieve an object of type recordType
+        specified by internalId. All NetSuite types available for a search
+        are listed under :const:`constants.SEARCH_RECORD_TYPES`.
+
+        :param Record searchRecord: data object holding all parameters for the search.
+                    The utility function `search_factory` can be used to create one.
+        :return: result records and meta data about search result
+        :rtype: SearchResult(type):
+                    int totalRecords: total number of records
+                    int pageSize: number of records per page
+                    int totalPages: number of pages
+                    int pageIndex: index of actual returned result page
+                    str searchId: identifier for the search
+                    list records: the actual records found
+        """
+        response = self.request(
+            'search', 
+            searchRecord=searchRecord
+        )
+
+        result = response.body.searchResult
+        print("resultRow: %s" % result.searchRowList)
+        status = result.status
+        success = status.isSuccess
+        if success:
+            if hasattr(result.recordList, 'record'):
+                result.records = result.recordList.record
+                return result
+            else:
+                # Did not find anything
+                result.records = None
+                return result
+        else:
+            exc = self._request_error('search', detail=status['statusDetail'][0])
+            raise exc
+
+    def searchMoreWithId__deprecated(self, searchId, pageIndex):
+        response = self.request('searchMoreWithId',
+                                searchId=searchId,
+                                pageIndex=pageIndex)
+        result = response.body.searchResult
+        print("resultRow: %s" % result.searchRowList)
+        status = result.status
+        success = status.isSuccess
+        if success:
+            result.records = result.recordList.record
+            return result
+        else:
+            exc = self._request_error('searchMoreWithId', detail=status['statusDetail'][0])
+            raise exc
