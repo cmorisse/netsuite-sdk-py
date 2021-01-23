@@ -394,6 +394,17 @@ class NetSuiteClient:
             exc = self._request_error('get', detail=status['statusDetail'][0])
             raise exc
 
+    def getServerTime(self):
+        response = self.request('getServerTime')
+        response = response.body.getServerTimeResult
+        status = response.status
+        if status.isSuccess:
+            result = response['serverTime']
+            return result
+        else:
+            exc = self._request_error('get', detail=status['statusDetail'][0])
+            raise exc
+
 
     def getList(self, dictList):
         """
