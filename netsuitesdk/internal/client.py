@@ -495,6 +495,34 @@ class NetSuiteClient:
             exc = self._request_error('getAll', detail=status['statusDetail'][0])
             raise exc
 
+    def add(self, record):
+        """ The add operation is used to add a new instance of a record in NetSuite. It is similar 
+        to the addList operation except that it allows only one record to be added at a time. 
+        Note that to prevent duplicate records, NetSuite recommends using the alternate 
+        upsert and upsertList operations along with external IDs to add records to NetSuite.
+
+        Important: Although records of a particular type may be used in multiple integration 
+        scenarios, each record instance can only have a single external ID value. To maintain data 
+        integrity, only a single integrated application can set and update external ID values for 
+        each record type. External ID values for all records of each type must all come from the 
+        same external application.
+
+        :param record: A Record.
+
+        :return: 
+        :rtype: dict
+        """
+        response = self.request(
+            'add', 
+            record=record
+        )
+        result = response.body.writeResponse
+        if result.status.isSuccess:
+            return result
+        else:
+            exc = self._request_error('search', detail=result.status['statusDetail'][0])
+            raise exc
+
     def search(self, searchRecord):
         """ Search for a set of records based on specific search criteria. This operation supports 
         pagination, so that large result sets can be retrieved in smaller sets. 
@@ -539,8 +567,6 @@ class NetSuiteClient:
         else:
             exc = self._request_error('search', detail=result.status['statusDetail'][0])
             raise exc
-
-
 
     #
     # Search model _DEPRECATED_
